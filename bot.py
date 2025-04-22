@@ -3,6 +3,9 @@ from discord.ext import commands
 import os
 from dotenv import load_dotenv
 
+from keep_alive import keep_alive
+keep_alive()
+
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -69,26 +72,29 @@ async def on_message(message):
 async def say(ctx, channel: discord.TextChannel, *, message):
     member = ctx.author
     allowed_roles = [role.id for role in member.roles if role.id in map(int, ALLOWED_ROLE_IDS)]
-    
+
     if allowed_roles:
-        await channel.send(content=message, allowed_mentions=discord.AllowedMentions(everyone=True))
-        await ctx.send(f"✅ Pesan sudah dikirim ke {channel.mention}")
+        try:
+            await channel.send(content=message, allowed_mentions=discord.AllowedMentions(everyone=True))
+            await ctx.send(f"✅ Pesan sudah dikirim ke {channel.mention}")
+        except discord.Forbidden:
+            await ctx.send("❌ Bot tidak memiliki izin untuk mengirim pesan di channel ini.")
     else:
         await ctx.send("❌ Anda tidak memiliki izin untuk menggunakan command ini.")
 
 @bot.command()
 async def join(ctx):
     """Perintah untuk bot bergabung dengan channel voice tempat pengguna berada dan mute mic-nya"""
-    # Cek apakah pengguna berada di channel voice
     if ctx.author.voice:
-        channel = ctx.author.voice.channel  # Dapatkan channel voice yang sedang ditempati oleh pengguna
+        channel = ctx.author.voice.channel
         if ctx.voice_client:
-            return await ctx.voice_client.move_to(channel)  # Jika bot sudah ada di voice channel yang lain, pindahkan ke channel yang sama
-        
-        # Bergabung ke voice channel dan mute bot
+            if ctx.voice_client.channel != channel:
+                await ctx.voice_client.move_to(channel)  # Jika bot sudah ada di voice channel yang lain, pindahkan ke channel yang sama
+            return
+
         voice_client = await channel.connect()
         await voice_client.edit(mute=True)  # Mematikan mikrofon bot
-        
+
         await ctx.send(f'✅ Bot telah bergabung dengan channel {channel.name} dan mute mic-nya.')
     else:
         await ctx.send("❌ Anda harus berada di channel voice terlebih dahulu untuk menggunakan perintah ini.")
